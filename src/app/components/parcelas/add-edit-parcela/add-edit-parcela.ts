@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { ParcelaService } from '../../../services/parcela-service';
 import { Parcela } from '../../../models/parcela';
 
@@ -14,94 +14,113 @@ export class AddEditParcela implements OnInit {
 
     formParcela!: FormGroup;
     submitting = false;
+    editMode = false;
+    parcelaId: number | null = null;
 
     constructor(
         private fb: FormBuilder,
         private parcelaService: ParcelaService,
-        private router: Router
+        private router: Router,
+        private route: ActivatedRoute
     ) { }
 
     ngOnInit(): void {
         this.formParcela = this.fb.group({
+            id: [null],
             nombre: ['', Validators.required],
             longitud: [null, [Validators.required]],
             latitud: [null, [Validators.required]],
             tamano: [null, [Validators.required]]
         });
+
+        // Revisar si venimos con query param ?id= para entrar en modo edición
+        this.route.queryParams.subscribe(params => {
+            const idParam = params['id'] ?? params['parcelaId'];
+            if (idParam) {
+                this.editMode = true;
+                this.parcelaId = Number(idParam);
+                this.loadParcela(this.parcelaId);
+            }
+        });
     }
 
-    guardarParcela(): void {
-
-        // Hay que reevaluar, seria para la forma de editar
-
-        // Verificar que el formulario es válido
-        if (this.formParcela.invalid) {
-            this.formParcela.markAllAsTouched();
-            console.log('Formulario inválido:', this.formParcela);
+    private loadParcela(id: number): void {
+        const clienteId = Number(localStorage.getItem('user_id'));
+        if (!clienteId) {
+            console.error('No se encontró clienteId en localStorage');
             return;
         }
 
-        // Obtener el user_id desde el localStorage, que es el ID del cliente
+        // Obtener todas las parcelas del cliente y buscar la que coincida con el ID
+        this.parcelaService.getByClienteId(clienteId).subscribe({
+            next: (parcelas: Parcela[]) => {
+                const parcela = parcelas.find(p => p.id === id);
+                if (parcela) {
+                    this.formParcela.patchValue({
+                        id: parcela.id,
+                        nombre: parcela.nombre,
+                        longitud: parcela.longitud,
+                        latitud: parcela.latitud,
+                        tamano: parcela.tamano
+                    });
+                } else {
+                    console.error('Parcela no encontrada en la lista del cliente');
+                }
+            },
+            error: (err) => {
+                console.error('Error al cargar parcelas del cliente:', err);
+            }
+        });
+    }
+
+    guardarParcela(): void {
+        if (this.formParcela.invalid) {
+            this.formParcela.markAllAsTouched();
+            return;
+        }
+
         const clienteId = Number(localStorage.getItem('user_id'));
         if (!clienteId || clienteId === 0) {
             console.error('No se encontró clienteId/user_id en localStorage');
-            return;  // Salir si no hay clienteId
+            return;
         }
 
-        // Crear el objeto nuevaParcela con los valores del formulario
-        //   const nuevaParcela: Parcela = {
-        //     id: 0,  // El id será generado por el backend
-        //     nombre: this.formParcela.value.nombre,
-        //     longitud: Number(this.formParcela.value.longitud),
-        //     latitud: Number(this.formParcela.value.latitud),
-        //     tamano: Number(this.formParcela.value.tamano)
-        //   };
-
-        // Marcar como "en proceso" para evitar múltiples envíos
         this.submitting = true;
 
-        /*
-        
-        export interface Parcela {
-            id: number;
-            nombre: string;
-            longitud: number;
-            latitud: number;
-            tamano: number;
-            
-        }
-        
-        */
-    }
-
-    CrearParcela() {
-        // Llamar al servicio para crear la parcela (el interceptor añadirá automáticamente el token)
-        // El token ya estaria, es necesario?
-
-        const nuevaParcela:Parcela = {
+        const parcela: Parcela = {
             id:this.formParcela.get("id")?.value,
             nombre:this.formParcela.get("nombre")?.value,
             longitud:this.formParcela.get("longitud")?.value,
             latitud:this.formParcela.get("latitud")?.value,
-            tamano:this.formParcela.get("tamano")?.value            
-        }
-        const clienteId = Number(localStorage.getItem('user_id'));
-        if (!clienteId || clienteId === 0) {
-            console.error('No se encontró clienteId/user_id en localStorage');
-            return;  // Salir si no hay clienteId
-        }
+            tamano:this.formParcela.get("tamano")?.value   
+        };
 
-        this.parcelaService.create(clienteId, nuevaParcela).subscribe({
-            next: (data:Parcela) => {
-                this.submitting = false;
-                // Navegar de vuelta a la lista de parcelas
-                this.router.navigate(['/parcelas']);
-            },
-            error: (err:any) => {
-                this.submitting = false;
-                console.error('Error al crear parcela:', err);
-            }
-        });
+        if (this.editMode && this.parcelaId) {
+            // Actualizar
+            this.parcelaService.update(this.parcelaId, parcela).subscribe({
+                next: (data: Parcela) => {
+                    this.submitting = false;
+                    this.router.navigate(['/parcelas']);
+                },
+                error: (err) => {
+                    this.submitting = false;
+                    console.error('Error al actualizar parcela:', err);
+                }
+            });
+        } else {
+            // Crear nueva
+            this.parcelaService.create(clienteId, parcela).subscribe({
+                next: (data: Parcela) => {
+                    this.submitting = false;
+                    this.router.navigate(['/parcelas']);
+                },
+                error: (err) => {
+                    this.submitting = false;
+                    console.error('Error al crear parcela:', err);
+                }
+            });
+        }
     }
+    
 
 }
