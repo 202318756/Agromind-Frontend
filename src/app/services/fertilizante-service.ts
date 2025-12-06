@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { CultivoFertilizante } from '../models/cultivo-fertilizante';
 import { Fertilizante } from '../models/fertilizante';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'

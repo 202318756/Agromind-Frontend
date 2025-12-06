@@ -17,6 +17,11 @@ export class CultivoService {
     return this.http.get<Cultivo[]>(`${this.apiUrl}/list`);
   }
 
+  // Obtener cultivos por cliente (usuario logueado)
+  getCultivosByCliente(clienteId: number): Observable<Cultivo[]> {
+    return this.http.get<Cultivo[]>(`${this.apiUrl}/cliente/${clienteId}`);
+  }
+
   // Obtener cultivos por parcela (nuevo endpoint en backend)
   getByParcela(parcelaId: number): Observable<Cultivo[]> {
     return this.http.get<Cultivo[]>(`${this.apiUrl}/parcela/${parcelaId}`);
@@ -33,6 +38,11 @@ export class CultivoService {
 
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/delete/${id}`);
+  }
+
+  // Soft delete - cambiar estado a Inactivo
+  softDelete(id: number): Observable<Cultivo> {
+    return this.http.put<Cultivo>(`${this.apiUrl}/update/${id}`, { estado: 'Inactivo' });
   }
 
   getById(id: number): Observable<Cultivo> {
